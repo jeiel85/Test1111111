@@ -3,55 +3,33 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>찬양 악보 찾기 🎵</title>
+    <title>찬양 악보 찾기 완성판 🎵</title>
     <style>
-        body {
-            margin: 0; padding: 0;
-            font-family: -apple-system, sans-serif;
-            background-color: #f5f5f5;
-            display: flex; flex-direction: column;
-            height: 100vh;
+        /* 기존 스타일 유지 */
+        body { margin: 0; padding: 0; font-family: -apple-system, sans-serif; background-color: #f5f5f5; display: flex; flex-direction: column; height: 100vh; }
+        header { background-color: white; padding: 15px; text-align: center; font-weight: bold; font-size: 18px; position: sticky; top: 0; z-index: 10; border-bottom: 1px solid #ddd; }
+        main { flex: 1; overflow-y: auto; padding: 20px; padding-bottom: 80px; /* 하단 버튼 공간 확보 */ }
+        textarea { width: 100%; height: 150px; border: 1px solid #ddd; border-radius: 8px; padding: 10px; font-size: 16px; box-sizing: border-box; resize: none; }
+        .btn-search { width: 100%; padding: 15px; background-color: #0070f3; color: white; border: none; border-radius: 8px; font-size: 18px; font-weight: bold; margin-top: 10px; cursor: pointer; }
+        .result-area { margin-top: 30px; }
+        .sheet-music-card { background: white; border-radius: 12px; padding: 15px; margin-bottom: 20px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); text-align: center; }
+        .sheet-music-card img { width: 100%; height: auto; border-radius: 4px; min-height: 100px; background: #f0f0f0; }
+        .sheet-title { margin-bottom: 10px; font-weight: bold; color: #333; text-align: left; }
+        .error-msg { color: red; font-size: 14px; margin-top: 5px; }
+        
+        /* 새로 추가된 하단 고정 버튼 스타일 */
+        .bottom-bar {
+            position: fixed; bottom: 0; left: 0; right: 0;
+            background: white; padding: 15px;
+            border-top: 1px solid #eee;
+            display: flex; justify-content: center;
+            display: none; /* 처음엔 숨김 */
         }
-        header {
-            background-color: white; padding: 15px;
-            text-align: center; font-weight: bold; font-size: 18px;
-            position: sticky; top: 0; z-index: 10;
-            border-bottom: 1px solid #ddd;
-        }
-        main {
-            flex: 1; overflow-y: auto; padding: 20px;
-        }
-        textarea {
-            width: 100%; height: 150px;
-            border: 1px solid #ddd; border-radius: 8px;
-            padding: 10px; font-size: 16px;
-            box-sizing: border-box; resize: none;
-        }
-        .btn-search {
+        .btn-download-all {
             width: 100%; padding: 15px;
-            background-color: #0070f3; color: white;
-            border: none; border-radius: 8px;
-            font-size: 16px; font-weight: bold;
-            margin-top: 10px; cursor: pointer;
-        }
-        .result-area {
-            margin-top: 30px;
-        }
-        .sheet-music-card {
-            background: white; border-radius: 12px;
-            padding: 15px; margin-bottom: 20px;
-            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
-            text-align: center;
-        }
-        .sheet-music-card img {
-            width: 100%; height: auto;
-            border-radius: 4px;
-        }
-        .sheet-title {
-            margin-bottom: 10px; font-weight: bold; color: #333;
-        }
-        .error-msg {
-            color: red; font-size: 14px; margin-top: 5px;
+            background-color: #28a745; /* 초록색 */
+            color: white; border: none; border-radius: 8px;
+            font-size: 18px; font-weight: bold; cursor: pointer;
         }
     </style>
 </head>
@@ -69,59 +47,125 @@
 165 세상이
 136 나의 주님은
 367 지극히 높은 주님의</textarea>
-            <button class="btn-search" onclick="findSheetMusic()">악보 찾기 🔍</button>
+            <button class="btn-search" onclick="startSearch()">악보 찾기 🔍</button>
         </div>
 
         <div id="result-container" class="result-area"></div>
     </main>
 
+    <div class="bottom-bar" id="download-bar">
+        <button class="btn-download-all" onclick="downloadAll()">전체 악보 순서대로 저장 📥</button>
+    </div>
+
     <script>
-        /**
-         * Input: User Text (Song List)
-         * Output: Image Elements (Sheet Music)
-         * Logic: 
-         * 1. 텍스트를 줄바꿈(\n) 기준으로 쪼갠다.
-         * 2. 각 줄의 맨 앞에 있는 숫자(곡번호)를 추출한다.
-         * 3. 'images/곡번호.jpg' 경로로 이미지 태그를 생성한다.
-         */
-        function findSheetMusic() {
+        // 시도해볼 확장자 목록 (순서대로 시도함)
+        const EXTENSIONS = ['.jpg', '.png', '.gif', '.bmp', '.jpeg'];
+        
+        // 찾은 이미지들의 정보를 순서대로 저장할 배열 (다운로드용)
+        let foundImages = [];
+
+        function startSearch() {
             const inputText = document.getElementById('song-input').value;
             const resultContainer = document.getElementById('result-container');
+            const downloadBar = document.getElementById('download-bar');
             
-            // 결과창 초기화 (이전 검색 결과 삭제)
-            resultContainer.innerHTML = "";
+            resultContainer.innerHTML = ""; // 결과창 초기화
+            foundImages = []; // 찾은 이미지 목록 초기화
+            downloadBar.style.display = 'none'; // 다운로드 버튼 숨김
 
-            // 줄 단위로 분리하고 빈 줄은 제거
             const lines = inputText.split('\n').filter(line => line.trim() !== "");
+            if (lines.length === 0) return alert("곡 리스트를 입력해주세요!");
 
-            if (lines.length === 0) {
-                alert("곡 리스트를 입력해주세요!");
+            // 각 줄에 대해 처리 시작
+            lines.forEach((line, index) => {
+                const match = line.match(/^(\d+)/); // 숫자 추출
+                if (match) {
+                    const songNumber = match[1];
+                    const songTitle = line.substring(songNumber.length).trim();
+                    
+                    // 1. 카드 UI 뼈대 만들기
+                    const card = document.createElement('div');
+                    card.className = 'sheet-music-card';
+                    card.innerHTML = `<div class="sheet-title">${index + 1}. No. ${songNumber} ${songTitle}</div>`;
+                    
+                    // 2. 이미지 태그 만들기 (처음엔 src가 없음)
+                    const imgTag = document.createElement('img');
+                    imgTag.alt = `${songNumber} 악보 로딩중...`;
+                    card.appendChild(imgTag);
+                    resultContainer.appendChild(card);
+
+                    // 3. 이미지 찾기 시작 (핵심 로직!)
+                    tryLoadImage(imgTag, songNumber, 0, (finalSrc) => {
+                        // 이미지를 성공적으로 찾았을 때 실행되는 콜백 함수
+                        // 순서를 보장하기 위해 인덱스와 파일명을 함께 저장
+                        const fileExt = finalSrc.substring(finalSrc.lastIndexOf('.'));
+                        const fileName = `${String(index + 1).padStart(2, '0')}번_${songNumber}${fileExt}`;
+                        
+                        // 배열의 올바른 위치에 저장 (비동기라 순서가 섞일 수 있으므로 인덱스 사용)
+                        foundImages[index] = { url: finalSrc, name: fileName };
+
+                        // 모든 이미지를 다 찾았는지 확인하여 다운로드 버튼 표시
+                        const foundCount = foundImages.filter(item => item !== undefined).length;
+                        if (foundCount > 0 && foundCount === lines.length) {
+                             downloadBar.style.display = 'flex';
+                        }
+                    });
+                }
+            });
+        }
+
+        /**
+         * 재귀 함수: 이미지를 찾을 때까지 확장자를 바꿔가며 시도한다.
+         * @param imgElement - src를 넣을 이미지 태그
+         * @param songNum - 곡 번호
+         * @param extIndex - 현재 시도할 확장자의 인덱스
+         * @param onSuccess - 성공 시 실행할 함수
+         */
+        function tryLoadImage(imgElement, songNum, extIndex, onSuccess) {
+            // 모든 확장자를 다 시도했는데 실패한 경우
+            if (extIndex >= EXTENSIONS.length) {
+                imgElement.alt = "❌ 이미지를 찾을 수 없습니다.";
+                imgElement.parentElement.innerHTML += `<p class="error-msg">⚠️ 파일 없음 (jpg, png, gif 등 확인 필요)</p>`;
                 return;
             }
 
-            lines.forEach(line => {
-                // 정규표현식: 문자열 시작(^)에서 숫자(\d+)만 추출
-                const match = line.match(/^(\d+)/);
-                
-                if (match) {
-                    const songNumber = match[1]; // 예: "276"
-                    const songTitle = line.substring(songNumber.length).trim(); // 제목만 남김
+            const currentExt = EXTENSIONS[extIndex];
+            const trySrc = `images/${songNum}${currentExt}`; // 예: images/276.jpg
 
-                    // 카드 생성
-                    const card = document.createElement('div');
-                    card.className = 'sheet-music-card';
+            // 이미지 로드 시도
+            const tempImg = new Image();
+            tempImg.onload = function() {
+                // 성공! 실제 이미지 태그에 주소 적용
+                imgElement.src = trySrc;
+                imgElement.alt = `${songNum} 악보`;
+                onSuccess(trySrc); // 성공 콜백 호출
+            };
+            tempImg.onerror = function() {
+                // 실패! 다음 확장자로 넘어가서 다시 시도 (재귀 호출)
+                console.log(`${trySrc} 실패, 다음 확장자 시도...`);
+                tryLoadImage(imgElement, songNum, extIndex + 1, onSuccess);
+            };
+            tempImg.src = trySrc; // 로드 시작 트리거
+        }
 
-                    // 왜: 이미지가 로드되지 않을 경우(파일 없음)를 대비해 onerror 처리를 추가함.
-                    card.innerHTML = `
-                        <div class="sheet-title">No. ${songNumber} ${songTitle}</div>
-                        <img src="images/${songNumber}.jpg" 
-                             alt="${songNumber} 악보" 
-                             onerror="this.onerror=null; this.src=''; this.parentElement.innerHTML+='<p class=\'error-msg\'>⚠️ 이미지를 찾을 수 없습니다 (images/${songNumber}.jpg)</p>'">
-                        <p style="font-size:12px; color:#888; margin-top:10px;">꾹 눌러서 저장/공유 하세요</p>
-                    `;
-                    
-                    resultContainer.appendChild(card);
-                }
+        /**
+         * 일괄 다운로드 함수: 찾은 이미지들을 순서대로 다운로드한다.
+         */
+        function downloadAll() {
+            if (foundImages.length === 0) return alert("저장할 악보가 없습니다.");
+            if (!confirm(`${foundImages.length}개의 악보를 순서대로 저장하시겠습니까?\n(팝업 차단이 해제되어 있어야 합니다)`)) return;
+
+            // 0.5초 간격으로 하나씩 다운로드 실행 (브라우저 차단 방지)
+            foundImages.forEach((imgInfo, idx) => {
+                if(!imgInfo) return; // 혹시 실패한 이미지가 있으면 건너뜀
+                setTimeout(() => {
+                    const link = document.createElement('a');
+                    link.href = imgInfo.url;
+                    link.download = imgInfo.name; // 예: 01번_276.jpg
+                    document.body.appendChild(link);
+                    link.click();
+                    document.body.removeChild(link);
+                }, idx * 500); // 0ms, 500ms, 1000ms... 간격으로 실행
             });
         }
     </script>
