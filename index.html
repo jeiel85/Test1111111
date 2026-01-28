@@ -5,30 +5,44 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>찬양 악보 찾기 완성판 🎵</title>
     <style>
-        /* 기존 스타일 유지 */
+        /* 기본 스타일 */
         body { margin: 0; padding: 0; font-family: -apple-system, sans-serif; background-color: #f5f5f5; display: flex; flex-direction: column; height: 100vh; }
         header { background-color: white; padding: 15px; text-align: center; font-weight: bold; font-size: 18px; position: sticky; top: 0; z-index: 10; border-bottom: 1px solid #ddd; }
-        main { flex: 1; overflow-y: auto; padding: 20px; padding-bottom: 80px; /* 하단 버튼 공간 확보 */ }
+        main { flex: 1; overflow-y: auto; padding: 20px; padding-bottom: 80px; }
         textarea { width: 100%; height: 150px; border: 1px solid #ddd; border-radius: 8px; padding: 10px; font-size: 16px; box-sizing: border-box; resize: none; }
-        .btn-search { width: 100%; padding: 15px; background-color: #0070f3; color: white; border: none; border-radius: 8px; font-size: 18px; font-weight: bold; margin-top: 10px; cursor: pointer; }
+        
+        /* 버튼 그룹 스타일 (가로 배치용) */
+        .btn-group { display: flex; gap: 10px; margin-top: 10px; }
+        
+        .btn-search { 
+            flex: 2; /* 공간을 2배 더 차지함 */
+            padding: 15px; background-color: #0070f3; color: white; 
+            border: none; border-radius: 8px; font-size: 18px; font-weight: bold; cursor: pointer; 
+        }
+        
+        .btn-reset { 
+            flex: 1; /* 공간을 1만큼 차지함 */
+            padding: 15px; background-color: #e0e0e0; color: #333; 
+            border: none; border-radius: 8px; font-size: 18px; font-weight: bold; cursor: pointer; 
+        }
+
         .result-area { margin-top: 30px; }
         .sheet-music-card { background: white; border-radius: 12px; padding: 15px; margin-bottom: 20px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); text-align: center; }
         .sheet-music-card img { width: 100%; height: auto; border-radius: 4px; min-height: 100px; background: #f0f0f0; }
         .sheet-title { margin-bottom: 10px; font-weight: bold; color: #333; text-align: left; }
         .error-msg { color: red; font-size: 14px; margin-top: 5px; }
         
-        /* 새로 추가된 하단 고정 버튼 스타일 */
+        /* 하단 고정 버튼 */
         .bottom-bar {
             position: fixed; bottom: 0; left: 0; right: 0;
             background: white; padding: 15px;
             border-top: 1px solid #eee;
             display: flex; justify-content: center;
-            display: none; /* 처음엔 숨김 */
+            display: none; 
         }
         .btn-download-all {
             width: 100%; padding: 15px;
-            background-color: #28a745; /* 초록색 */
-            color: white; border: none; border-radius: 8px;
+            background-color: #28a745; color: white; border: none; border-radius: 8px;
             font-size: 18px; font-weight: bold; cursor: pointer;
         }
     </style>
@@ -47,7 +61,11 @@
 165 세상이
 136 나의 주님은
 367 지극히 높은 주님의</textarea>
-            <button class="btn-search" onclick="startSearch()">악보 찾기 🔍</button>
+            
+            <div class="btn-group">
+                <button class="btn-reset" onclick="resetAll()">초기화 🔄</button>
+                <button class="btn-search" onclick="startSearch()">악보 찾기 🔍</button>
+            </div>
         </div>
 
         <div id="result-container" class="result-area"></div>
@@ -58,53 +76,54 @@
     </div>
 
     <script>
-        // 시도해볼 확장자 목록 (순서대로 시도함)
         const EXTENSIONS = ['.jpg', '.png', '.gif', '.bmp', '.jpeg'];
-        
-        // 찾은 이미지들의 정보를 순서대로 저장할 배열 (다운로드용)
         let foundImages = [];
+
+        // --- 새로 추가된 초기화 함수 ---
+        function resetAll() {
+            // 1. 입력창 비우기
+            document.getElementById('song-input').value = "";
+            // 2. 결과 화면 비우기
+            document.getElementById('result-container').innerHTML = "";
+            // 3. 다운로드 버튼 숨기기
+            document.getElementById('download-bar').style.display = 'none';
+            // 4. 입력창에 커서 깜빡이게 하기 (바로 붙여넣기 좋게)
+            document.getElementById('song-input').focus();
+        }
 
         function startSearch() {
             const inputText = document.getElementById('song-input').value;
             const resultContainer = document.getElementById('result-container');
             const downloadBar = document.getElementById('download-bar');
             
-            resultContainer.innerHTML = ""; // 결과창 초기화
-            foundImages = []; // 찾은 이미지 목록 초기화
-            downloadBar.style.display = 'none'; // 다운로드 버튼 숨김
+            resultContainer.innerHTML = ""; 
+            foundImages = []; 
+            downloadBar.style.display = 'none'; 
 
             const lines = inputText.split('\n').filter(line => line.trim() !== "");
             if (lines.length === 0) return alert("곡 리스트를 입력해주세요!");
 
-            // 각 줄에 대해 처리 시작
             lines.forEach((line, index) => {
-                const match = line.match(/^(\d+)/); // 숫자 추출
+                const match = line.match(/^(\d+)/); 
                 if (match) {
                     const songNumber = match[1];
                     const songTitle = line.substring(songNumber.length).trim();
                     
-                    // 1. 카드 UI 뼈대 만들기
                     const card = document.createElement('div');
                     card.className = 'sheet-music-card';
                     card.innerHTML = `<div class="sheet-title">${index + 1}. No. ${songNumber} ${songTitle}</div>`;
                     
-                    // 2. 이미지 태그 만들기 (처음엔 src가 없음)
                     const imgTag = document.createElement('img');
                     imgTag.alt = `${songNumber} 악보 로딩중...`;
                     card.appendChild(imgTag);
                     resultContainer.appendChild(card);
 
-                    // 3. 이미지 찾기 시작 (핵심 로직!)
                     tryLoadImage(imgTag, songNumber, 0, (finalSrc) => {
-                        // 이미지를 성공적으로 찾았을 때 실행되는 콜백 함수
-                        // 순서를 보장하기 위해 인덱스와 파일명을 함께 저장
                         const fileExt = finalSrc.substring(finalSrc.lastIndexOf('.'));
                         const fileName = `${String(index + 1).padStart(2, '0')}번_${songNumber}${fileExt}`;
                         
-                        // 배열의 올바른 위치에 저장 (비동기라 순서가 섞일 수 있으므로 인덱스 사용)
                         foundImages[index] = { url: finalSrc, name: fileName };
 
-                        // 모든 이미지를 다 찾았는지 확인하여 다운로드 버튼 표시
                         const foundCount = foundImages.filter(item => item !== undefined).length;
                         if (foundCount > 0 && foundCount === lines.length) {
                              downloadBar.style.display = 'flex';
@@ -114,15 +133,7 @@
             });
         }
 
-        /**
-         * 재귀 함수: 이미지를 찾을 때까지 확장자를 바꿔가며 시도한다.
-         * @param imgElement - src를 넣을 이미지 태그
-         * @param songNum - 곡 번호
-         * @param extIndex - 현재 시도할 확장자의 인덱스
-         * @param onSuccess - 성공 시 실행할 함수
-         */
         function tryLoadImage(imgElement, songNum, extIndex, onSuccess) {
-            // 모든 확장자를 다 시도했는데 실패한 경우
             if (extIndex >= EXTENSIONS.length) {
                 imgElement.alt = "❌ 이미지를 찾을 수 없습니다.";
                 imgElement.parentElement.innerHTML += `<p class="error-msg">⚠️ 파일 없음 (jpg, png, gif 등 확인 필요)</p>`;
@@ -130,42 +141,35 @@
             }
 
             const currentExt = EXTENSIONS[extIndex];
-            const trySrc = `images/${songNum}${currentExt}`; // 예: images/276.jpg
+            const trySrc = `images/${songNum}${currentExt}`;
 
-            // 이미지 로드 시도
             const tempImg = new Image();
             tempImg.onload = function() {
-                // 성공! 실제 이미지 태그에 주소 적용
                 imgElement.src = trySrc;
                 imgElement.alt = `${songNum} 악보`;
-                onSuccess(trySrc); // 성공 콜백 호출
+                onSuccess(trySrc); 
             };
             tempImg.onerror = function() {
-                // 실패! 다음 확장자로 넘어가서 다시 시도 (재귀 호출)
-                console.log(`${trySrc} 실패, 다음 확장자 시도...`);
+                // 실패 시 다음 확장자 시도 (재귀)
                 tryLoadImage(imgElement, songNum, extIndex + 1, onSuccess);
             };
-            tempImg.src = trySrc; // 로드 시작 트리거
+            tempImg.src = trySrc; 
         }
 
-        /**
-         * 일괄 다운로드 함수: 찾은 이미지들을 순서대로 다운로드한다.
-         */
         function downloadAll() {
             if (foundImages.length === 0) return alert("저장할 악보가 없습니다.");
             if (!confirm(`${foundImages.length}개의 악보를 순서대로 저장하시겠습니까?\n(팝업 차단이 해제되어 있어야 합니다)`)) return;
 
-            // 0.5초 간격으로 하나씩 다운로드 실행 (브라우저 차단 방지)
             foundImages.forEach((imgInfo, idx) => {
-                if(!imgInfo) return; // 혹시 실패한 이미지가 있으면 건너뜀
+                if(!imgInfo) return; 
                 setTimeout(() => {
                     const link = document.createElement('a');
                     link.href = imgInfo.url;
-                    link.download = imgInfo.name; // 예: 01번_276.jpg
+                    link.download = imgInfo.name; 
                     document.body.appendChild(link);
                     link.click();
                     document.body.removeChild(link);
-                }, idx * 500); // 0ms, 500ms, 1000ms... 간격으로 실행
+                }, idx * 500); 
             });
         }
     </script>
