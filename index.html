@@ -3,107 +3,126 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>나의 웹앱</title>
+    <title>찬양 악보 찾기 🎵</title>
     <style>
-        /* 기본 스타일 초기화 */
         body {
-            margin: 0;
-            padding: 0;
+            margin: 0; padding: 0;
             font-family: -apple-system, sans-serif;
             background-color: #f5f5f5;
-            display: flex;
-            flex-direction: column;
+            display: flex; flex-direction: column;
             height: 100vh;
         }
-
-        /* 상단 헤더 (앱 제목) */
         header {
-            background-color: white;
-            padding: 15px;
-            text-align: center;
-            font-weight: bold;
-            font-size: 18px;
-            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
-            position: sticky;
-            top: 0;
-            z-index: 10;
+            background-color: white; padding: 15px;
+            text-align: center; font-weight: bold; font-size: 18px;
+            position: sticky; top: 0; z-index: 10;
+            border-bottom: 1px solid #ddd;
         }
-
-        /* 메인 콘텐츠 영역 (스크롤 가능) */
         main {
-            flex: 1;
-            overflow-y: auto;
-            padding: 20px;
+            flex: 1; overflow-y: auto; padding: 20px;
         }
-
-        /* 카드 스타일 (내용 박스) */
-        .card {
-            background: white;
-            border-radius: 12px;
-            padding: 20px;
-            margin-bottom: 15px;
-            box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+        textarea {
+            width: 100%; height: 150px;
+            border: 1px solid #ddd; border-radius: 8px;
+            padding: 10px; font-size: 16px;
+            box-sizing: border-box; resize: none;
         }
-
-        /* 하단 내비게이션 바 */
-        nav {
-            background-color: white;
-            border-top: 1px solid #eee;
-            display: flex;
-            justify-content: space-around;
-            padding: 10px 0;
-            padding-bottom: 20px; /* 아이폰 홈바 대응 */
+        .btn-search {
+            width: 100%; padding: 15px;
+            background-color: #0070f3; color: white;
+            border: none; border-radius: 8px;
+            font-size: 16px; font-weight: bold;
+            margin-top: 10px; cursor: pointer;
         }
-
-        .nav-item {
-            font-size: 12px;
-            color: #888;
+        .result-area {
+            margin-top: 30px;
+        }
+        .sheet-music-card {
+            background: white; border-radius: 12px;
+            padding: 15px; margin-bottom: 20px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
             text-align: center;
-            cursor: pointer;
         }
-        
-        .nav-item.active {
-            color: #0070f3;
-            font-weight: bold;
+        .sheet-music-card img {
+            width: 100%; height: auto;
+            border-radius: 4px;
+        }
+        .sheet-title {
+            margin-bottom: 10px; font-weight: bold; color: #333;
+        }
+        .error-msg {
+            color: red; font-size: 14px; margin-top: 5px;
         }
     </style>
 </head>
 <body>
 
-    <header>내 멋진 앱</header>
+    <header>이번 주 찬양 콘티 🎶</header>
 
-    <main id="app-content">
-        <div class="card">
-            <h2>안녕하세요! 👋</h2>
-            <p>이제 제법 앱 같은 느낌이 나지 않나요?</p>
+    <main>
+        <div style="background: white; padding: 20px; border-radius: 12px;">
+            <h3>곡 리스트를 붙여넣으세요</h3>
+            <textarea id="song-input" placeholder="예:&#13;&#10;276 햇살보다 밝게&#13;&#10;123 당신은 지금 어디로">
+276 햇살보다 밝게 빛나는 주의
+123 당신은 지금 어디로 
+168 하나님은 너를 만드신 분
+165 세상이
+136 나의 주님은
+367 지극히 높은 주님의</textarea>
+            <button class="btn-search" onclick="findSheetMusic()">악보 찾기 🔍</button>
         </div>
-        
-        <div class="card">
-            <h3>오늘의 할 일</h3>
-            <ul style="padding-left: 20px; color: #555;">
-                <li>Vercel 배포하기 (완료) ✅</li>
-                <li>앱 디자인 입히기 (진행 중) 🚧</li>
-                <li>기능 추가하기 (대기 중) ⏳</li>
-            </ul>
-        </div>
+
+        <div id="result-container" class="result-area"></div>
     </main>
-
-    <nav>
-        <div class="nav-item active" onclick="switchTab('home')">홈</div>
-        <div class="nav-item" onclick="switchTab('search')">검색</div>
-        <div class="nav-item" onclick="switchTab('my')">마이페이지</div>
-    </nav>
 
     <script>
         /**
-         * Input: Tab Name (string)
-         * Output: UI Update (Alert for now)
-         * Logic: 탭을 눌렀을 때의 동작을 정의. 지금은 준비 중이라는 알림만 띄움.
+         * Input: User Text (Song List)
+         * Output: Image Elements (Sheet Music)
+         * Logic: 
+         * 1. 텍스트를 줄바꿈(\n) 기준으로 쪼갠다.
+         * 2. 각 줄의 맨 앞에 있는 숫자(곡번호)를 추출한다.
+         * 3. 'images/곡번호.jpg' 경로로 이미지 태그를 생성한다.
          */
-        function switchTab(tabName) {
-            // 왜: 아직 각 탭의 페이지를 만들지 않았으므로, 
-            // 버튼이 동작한다는 피드백만 주기 위해 alert를 사용함.
-            alert(tabName + " 탭을 눌렀어요! (기능 준비 중)");
+        function findSheetMusic() {
+            const inputText = document.getElementById('song-input').value;
+            const resultContainer = document.getElementById('result-container');
+            
+            // 결과창 초기화 (이전 검색 결과 삭제)
+            resultContainer.innerHTML = "";
+
+            // 줄 단위로 분리하고 빈 줄은 제거
+            const lines = inputText.split('\n').filter(line => line.trim() !== "");
+
+            if (lines.length === 0) {
+                alert("곡 리스트를 입력해주세요!");
+                return;
+            }
+
+            lines.forEach(line => {
+                // 정규표현식: 문자열 시작(^)에서 숫자(\d+)만 추출
+                const match = line.match(/^(\d+)/);
+                
+                if (match) {
+                    const songNumber = match[1]; // 예: "276"
+                    const songTitle = line.substring(songNumber.length).trim(); // 제목만 남김
+
+                    // 카드 생성
+                    const card = document.createElement('div');
+                    card.className = 'sheet-music-card';
+
+                    // 왜: 이미지가 로드되지 않을 경우(파일 없음)를 대비해 onerror 처리를 추가함.
+                    card.innerHTML = `
+                        <div class="sheet-title">No. ${songNumber} ${songTitle}</div>
+                        <img src="images/${songNumber}.jpg" 
+                             alt="${songNumber} 악보" 
+                             onerror="this.onerror=null; this.src=''; this.parentElement.innerHTML+='<p class=\'error-msg\'>⚠️ 이미지를 찾을 수 없습니다 (images/${songNumber}.jpg)</p>'">
+                        <p style="font-size:12px; color:#888; margin-top:10px;">꾹 눌러서 저장/공유 하세요</p>
+                    `;
+                    
+                    resultContainer.appendChild(card);
+                }
+            });
         }
     </script>
 </body>
